@@ -5,8 +5,7 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-# ========== ВСТАВЬТЕ ВАШ ТОКЕН ==========
-BOT_TOKEN = "8988244288:AAEquPWgHtuLaj7Kx3dRCLP0ZeIw0T3Dovc"
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8988244288:AAEquPWgHtuLaj7Kx3dRCLP0ZeIw0T3Dovc")
 
 DATA_FILE = "user_data.json"
 
@@ -307,19 +306,17 @@ async def reminder_loop(app: Application):
         
         await asyncio.sleep(60)
 
-def main():
+async def run_bot():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(CallbackQueryHandler(days_callback, pattern="^(day_|days_every|days_done)"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-    loop.create_task(reminder_loop(app))
+    asyncio.create_task(reminder_loop(app))
     
     print("✅ Умный бот-планировщик запущен!")
-    app.run_polling()
+    await app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(run_bot())
