@@ -1,6 +1,7 @@
 from flask import Flask
 import threading
 import os
+import subprocess
 
 app = Flask(__name__)
 
@@ -10,8 +11,10 @@ def health_check():
     return "Бот работает!", 200
 
 def run_bot():
-    import bot
+    # Запускаем бота в отдельном процессе
+    subprocess.run(["python", "bot.py"])
 
+# Запускаем бота при старте сервера
 thread = threading.Thread(target=run_bot)
 thread.start()
 
