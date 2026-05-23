@@ -5,7 +5,11 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8988244288:AAEquPWgHtuLaj7Kx3dRCLP0ZeIw0T3Dovc")
+BOT_TOKEN = os.environ.get("8988244288:AAEquPWgHtuLaj7Kx3dRCLP0ZeIw0T3Dovc")
+
+if not BOT_TOKEN:
+    print("Ошибка: BOT_TOKEN не найден!")
+    exit(1)
 
 DATA_FILE = "user_data.json"
 
@@ -62,7 +66,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "🏆 *Умный Планировщик*\n\n"
         "✅ Напоминания в нужное время\n"
         "📅 Задачи на определённые дни\n"
-        "➕ Свои задачи с любым расписанием\n\n"
+        "➕ Свои задачи\n\n"
         "Выбери действие 👇",
         reply_markup=await main_menu(),
         parse_mode="Markdown"
@@ -83,20 +87,16 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     if data == "list":
         text = "📋 *Твои задачи:*\n\n"
-        text += "*По расписанию:*\n"
         for task in TASKS:
             status = "✅" if user_data["tasks"].get(task["name"], False) else "❌"
             days_str = "каждый день" if task["days"] is None else " ".join(DAYS_RU[d] for d in task["days"])
-            is_today = " 🔵" if check_day(task["days"]) else ""
-            text += f"{status} {task['name']} ({days_str}){is_today}\n"
-        
+            text += f"{status} {task['name']} ({days_str})\n"
         if user_data["custom_tasks"]:
             text += "\n*Мои задачи:*\n"
             for ct in user_data["custom_tasks"]:
                 status = "✅" if ct.get("done", False) else "❌"
                 days_str = "каждый день" if ct["days"] is None else " ".join(DAYS_RU[d] for d in ct["days"])
-                text += f"{status} {ct['name']} ({days_str} в {ct['time']})\n"
-        
+                text += f"{status} {ct['name']} ({days_str})\n"
         await query.edit_message_text(text, reply_markup=await main_menu(), parse_mode="Markdown")
     
     elif data == "complete":
@@ -104,13 +104,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for task in TASKS:
             if check_day(task["days"]) and not user_data["tasks"].get(task["name"], False):
                 keyboard.append([InlineKeyboardButton(f"⬜ {task['name']}", callback_data=f"done_{task['name']}")])
-        
         for i, ct in enumerate(user_data["custom_tasks"]):
             if not ct.get("done", False):
                 keyboard.append([InlineKeyboardButton(f"⬜ {ct['name']}", callback_data=f"done_custom_{i}")])
-        
         if not keyboard:
-            keyboard.append([InlineKeyboardButton("🎉 Молодец! Всё сделано!", callback_data="noop")])
+            keyboard.append([InlineKeyboardButton("🎉 Всё сделано!", callback_data="noop")])
         keyboard.append([InlineKeyboardButton("🔙 Назад", callback_data="back")])
         await query.edit_message_text("✅ Отметь выполненное:", reply_markup=InlineKeyboardMarkup(keyboard))
     
@@ -127,19 +125,11 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"✅ {user_data['custom_tasks'][idx]['name']} выполнена!", reply_markup=await main_menu())
     
     elif data == "stats":
-        total = 0
-        completed = 0
-        for task in TASKS:
-            if check_day(task["days"]):
-                total += 1
-                if user_data["tasks"].get(task["name"], False):
-                    completed += 1
-        for ct in user_data["custom_tasks"]:
-            total += 1
-            if ct.get("done", False):
-                completed += 1
+        total = sum(1 for task in TASKS if check_day(task["days"])) + len(user_data["custom_tasks"])
+        completed = sum(1 for task in TASKS if check_day(task["days"]) and user_data["tasks"].get(task["name"], False))
+        completed += sum(1 for ct in user_data["custom_tasks"] if ct.get("done", False))
         percent = int(completed / total * 100) if total > 0 else 0
-        text = f"📊 *Статистика на сегодня:*\n\n✅ {completed} из {total} ({percent}%)\n🏆 " + "█" * (percent // 10) + "░" * (10 - percent // 10)
+        text = f"📊 *Статистика:*\n✅ {completed} из {total} ({percent}%)\n🏆 " + "█" * (percent // 10) + "░" * (10 - percent // 10)
         await query.edit_message_text(text, reply_markup=await main_menu(), parse_mode="Markdown")
     
     elif data == "reset":
@@ -148,15 +138,13 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         for ct in user_data["custom_tasks"]:
             ct["done"] = False
         save_data({str(user_id): user_data})
-        await query.edit_message_text("🔄 Задачи сброшены! Новый день — новые победы!", reply_markup=await main_menu())
+        await query.edit_message_text("🔄 Задачи сброшены!", reply_markup=await main_menu())
     
     elif data == "add_custom":
         context.user_data["custom_step"] = "name"
         await query.edit_message_text(
-            "✏️ *Своя задача*\n\n"
-            "Введи название задачи (например: «Полить цветы»):",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data="back")]]),
-            parse_mode="Markdown"
+            "✏️ Введи название задачи:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🔙 Отмена", callback_data="back")]])
         )
     
     elif data == "back":
@@ -165,24 +153,19 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text
-    _, user_data = get_user_data(user_id)
     
     step = context.user_data.get("custom_step")
     
     if step == "name":
         context.user_data["custom_name"] = text
         context.user_data["custom_step"] = "time"
-        await update.message.reply_text(
-            f"📌 Задача: «{text}»\n\n"
-            "Введи время напоминания в формате ЧЧ:ММ (например: 14:30):"
-        )
+        await update.message.reply_text("Введи время в формате ЧЧ:ММ (например: 14:30):")
     
     elif step == "time":
         try:
             datetime.strptime(text, "%H:%M")
             context.user_data["custom_time"] = text
             context.user_data["custom_step"] = "days"
-            
             keyboard = [
                 [InlineKeyboardButton("Каждый день", callback_data="days_every")],
                 [InlineKeyboardButton("Пн", callback_data="day_0"), InlineKeyboardButton("Вт", callback_data="day_1")],
@@ -190,12 +173,9 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                 [InlineKeyboardButton("Пт", callback_data="day_4"), InlineKeyboardButton("Сб", callback_data="day_5"), InlineKeyboardButton("Вс", callback_data="day_6")],
                 [InlineKeyboardButton("✅ Готово", callback_data="days_done")]
             ]
-            await update.message.reply_text(
-                "Выбери дни для напоминания:",
-                reply_markup=InlineKeyboardMarkup(keyboard)
-            )
+            await update.message.reply_text("Выбери дни:", reply_markup=InlineKeyboardMarkup(keyboard))
         except:
-            await update.message.reply_text("❌ Неверный формат. Введи ЧЧ:ММ (например: 14:30)")
+            await update.message.reply_text("Неверный формат. Введи ЧЧ:ММ")
     
     else:
         await update.message.reply_text("Используй кнопки меню 👆", reply_markup=await main_menu())
@@ -213,7 +193,6 @@ async def days_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data == "days_every":
         context.user_data["selected_days"] = None
         await save_custom_task(update, context, user_id)
-    
     elif data.startswith("day_"):
         day = int(data.split("_")[1])
         if day in context.user_data["selected_days"]:
@@ -221,10 +200,9 @@ async def days_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
         else:
             context.user_data["selected_days"].append(day)
         await show_days_selection(update, context)
-    
     elif data == "days_done":
         if not context.user_data["selected_days"]:
-            await query.edit_message_text("❌ Выбери хотя бы один день или «Каждый день»")
+            await query.edit_message_text("Выбери хотя бы один день")
         else:
             await save_custom_task(update, context, user_id)
 
@@ -242,11 +220,7 @@ async def show_days_selection(update: Update, context: ContextTypes.DEFAULT_TYPE
         keyboard.append(row)
     keyboard.append([InlineKeyboardButton("✅ Готово", callback_data="days_done")])
     keyboard.append([InlineKeyboardButton("Каждый день", callback_data="days_every")])
-    
-    await update.callback_query.edit_message_text(
-        "Выбери дни (можно несколько):",
-        reply_markup=InlineKeyboardMarkup(keyboard)
-    )
+    await update.callback_query.edit_message_text("Выбери дни:", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def save_custom_task(update: Update, context: ContextTypes.DEFAULT_TYPE, user_id):
     _, user_data = get_user_data(user_id)
@@ -266,9 +240,7 @@ async def save_custom_task(update: Update, context: ContextTypes.DEFAULT_TYPE, u
     
     days_str = "каждый день" if new_task["days"] is None else " ".join(DAYS_RU[d] for d in new_task["days"])
     await update.callback_query.edit_message_text(
-        f"✅ Задача «{new_task['name']}» добавлена!\n\n"
-        f"⏰ Время: {new_task['time']}\n"
-        f"📅 Дни: {days_str}",
+        f"✅ Задача «{new_task['name']}» добавлена!\n⏰ {new_task['time']}\n📅 {days_str}",
         reply_markup=await main_menu()
     )
 
@@ -276,47 +248,40 @@ async def reminder_loop(app: Application):
     while True:
         now = datetime.now().strftime("%H:%M")
         data = load_data()
-        
         for user_id_str, user_data in data.items():
             for task in TASKS:
                 if task["time"] == now and check_day(task["days"]):
                     if not user_data["tasks"].get(task["name"], False):
                         try:
-                            await app.bot.send_message(
-                                int(user_id_str),
-                                f"⏰ *Напоминание!*\n\nПора: {task['name']}",
-                                parse_mode="Markdown"
-                            )
+                            await app.bot.send_message(int(user_id_str), f"⏰ Напоминание: {task['name']}")
                         except:
                             pass
-            
             for ct in user_data.get("custom_tasks", []):
                 if ct.get("time") == now:
                     days = ct.get("days")
                     if days is None or datetime.now().weekday() in days:
                         if not ct.get("done", False):
                             try:
-                                await app.bot.send_message(
-                                    int(user_id_str),
-                                    f"⏰ *Напоминание!*\n\nПора: {ct['name']}",
-                                    parse_mode="Markdown"
-                                )
+                                await app.bot.send_message(int(user_id_str), f"⏰ Напоминание: {ct['name']}")
                             except:
                                 pass
-        
         await asyncio.sleep(60)
 
-async def run_bot():
+def main():
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(CallbackQueryHandler(days_callback, pattern="^(day_|days_every|days_done)"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    asyncio.create_task(reminder_loop(app))
+    # Запускаем напоминания в фоне
+    import threading
+    def run_reminders():
+        asyncio.run(reminder_loop(app))
+    threading.Thread(target=run_reminders, daemon=True).start()
     
-    print("✅ Умный бот-планировщик запущен!")
-    await app.run_polling()
+    print("Бот запущен!")
+    app.run_polling()
 
 if __name__ == "__main__":
-    asyncio.run(run_bot())
+    main()
