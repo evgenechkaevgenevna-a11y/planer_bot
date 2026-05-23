@@ -5,12 +5,14 @@ from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
 
-BOT_TOKEN = os.environ.get("8988244288:AAEquPWgHtuLaj7Kx3dRCLP0ZeIw0T3Dovc")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+
+print(f"Токен получен: {'ДА' if BOT_TOKEN else 'НЕТ'}")
 
 if not BOT_TOKEN:
     print("Ошибка: BOT_TOKEN не найден!")
     exit(1)
-
+   
 DATA_FILE = "user_data.json"
 
 TASKS = [
