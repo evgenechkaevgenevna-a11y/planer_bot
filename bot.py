@@ -164,20 +164,14 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введи время в формате ЧЧ:ММ (например: 14:30):")
     
     elif step == "time":
-        try:
-            datetime.strptime(text, "%H:%M")
-            context.user_data["custom_time"] = text
-            context.user_data["custom_step"] = "days"
-            keyboard = [
-                [InlineKeyboardButton("Каждый день", callback_data="days_every")],
-                [InlineKeyboardButton("Пн", callback_data="day_0"), InlineKeyboardButton("Вт", callback_data="day_1")],
-                [InlineKeyboardButton("Ср", callback_data="day_2"), InlineKeyboardButton("Чт", callback_data="day_3")],
-                [InlineKeyboardButton("Пт", callback_data="day_4"), InlineKeyboardButton("Сб", callback_data="day_5"), InlineKeyboardButton("Вс", callback_data="day_6")],
-                [InlineKeyboardButton("✅ Готово", callback_data="days_done")]
-            ]
-            await update.message.reply_text("Выбери дни:", reply_markup=InlineKeyboardMarkup(keyboard))
-        except:
-            await update.message.reply_text("Неверный формат. Введи ЧЧ:ММ")
+    try:
+        datetime.strptime(text, "%H:%M")
+        context.user_data["custom_time"] = text
+        # Сохраняем без выбора дней (каждый день)
+        context.user_data["selected_days"] = None
+        await save_custom_task(update, context, update.effective_user.id)
+    except:
+        await update.message.reply_text("❌ Неверный формат. Введи ЧЧ:ММ (например: 14:30)")
     
     else:
         await update.message.reply_text("Используй кнопки меню 👆", reply_markup=await main_menu())
