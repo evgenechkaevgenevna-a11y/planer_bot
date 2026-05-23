@@ -12,7 +12,7 @@ print(f"Токен получен: {'ДА' if BOT_TOKEN else 'НЕТ'}")
 if not BOT_TOKEN:
     print("Ошибка: BOT_TOKEN не найден!")
     exit(1)
-   
+
 DATA_FILE = "user_data.json"
 
 TASKS = [
@@ -164,14 +164,13 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("Введи время в формате ЧЧ:ММ (например: 14:30):")
     
     elif step == "time":
-    try:
-        datetime.strptime(text, "%H:%M")
-        context.user_data["custom_time"] = text
-        # Сохраняем без выбора дней (каждый день)
-        context.user_data["selected_days"] = None
-        await save_custom_task(update, context, update.effective_user.id)
-    except:
-        await update.message.reply_text("❌ Неверный формат. Введи ЧЧ:ММ (например: 14:30)")
+        try:
+            datetime.strptime(text, "%H:%M")
+            context.user_data["custom_time"] = text
+            context.user_data["selected_days"] = None
+            await save_custom_task(update, context, user_id)
+        except:
+            await update.message.reply_text("❌ Неверный формат. Введи ЧЧ:ММ")
     
     else:
         await update.message.reply_text("Используй кнопки меню 👆", reply_markup=await main_menu())
@@ -270,7 +269,6 @@ def main():
     app.add_handler(CallbackQueryHandler(days_callback, pattern="^(day_|days_every|days_done)"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    # Запускаем напоминания в фоне
     import threading
     def run_reminders():
         asyncio.run(reminder_loop(app))
